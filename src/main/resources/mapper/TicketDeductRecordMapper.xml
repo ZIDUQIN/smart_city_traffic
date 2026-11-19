@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartcity.traffic.mapper.TicketDeductRecordMapper">
+
+    <resultMap id="recordResultMap" type="com.smartcity.traffic.entity.DeductRecord">
+        <id column="id" property="id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="user_id" property="userId"/>
+        <result column="passenger_id" property="passengerId"/>
+        <result column="train_no" property="trainNo"/>
+        <result column="instance_no" property="instanceNo"/>
+        <result column="travel_date" property="travelDate"/>
+        <result column="seat_no" property="seatNo"/>
+        <result column="from_seq" property="fromSeq"/>
+        <result column="to_seq" property="toSeq"/>
+        <result column="status" property="status"/>
+        <result column="fail_reason" property="failReason"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.smartcity.traffic.entity.DeductRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ticket_deduct_record (order_no, user_id, passenger_id, train_no,
+                                          instance_no, travel_date,
+                                          seat_no, from_seq, to_seq, status, fail_reason,
+                                          create_time, update_time)
+        VALUES (#{orderNo}, #{userId}, #{passengerId}, #{trainNo},
+                #{instanceNo}, #{travelDate},
+                #{seatNo}, #{fromSeq}, #{toSeq}, #{status}, #{failReason},
+                #{createTime}, #{updateTime})
+    </insert>
+
+    <select id="selectByOrderNo" resultMap="recordResultMap">
+        SELECT id, order_no, user_id, passenger_id, train_no, instance_no, travel_date,
+               seat_no, from_seq, to_seq,
+               status, fail_reason, create_time, update_time
+        FROM ticket_deduct_record
+        WHERE order_no = #{orderNo}
+    </select>
+
+    <update id="casUpdateStatus">
+        UPDATE ticket_deduct_record
+        SET status      = #{newStatus},
+            fail_reason = #{failReason},
+            update_time = NOW()
+        WHERE order_no = #{orderNo}
+          AND status IN
+        <foreach collection="expectStatuses" item="s" open="(" separator="," close=")">
+            #{s}
+        </foreach>
+    </update>
+
+    <select id="selectIntermediate" resultMap="recordResultMap">
+        SELECT id, order_no, user_id, passenger_id, train_no, instance_no, travel_date,
+               seat_no, from_seq, to_seq,
+               status, fail_reason, create_time, update_time
+        FROM ticket_deduct_record
+        WHERE status IN ('扣减中', '已扣减')
+          AND update_time &lt; #{before}
+        ORDER BY update_time ASC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

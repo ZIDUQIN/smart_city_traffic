@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartcity.traffic.mapper.StockCapacityMapper">
+
+    <resultMap id="capacityResultMap" type="com.smartcity.traffic.entity.StockCapacityRecord">
+        <id column="id" property="id"/>
+        <result column="train_no" property="trainNo"/>
+        <result column="seat_no" property="seatNo"/>
+        <result column="segment_no" property="segmentNo"/>
+        <result column="total_capacity" property="totalCapacity"/>
+    </resultMap>
+
+    <select id="selectByTrainNo" resultMap="capacityResultMap">
+        SELECT id, train_no, seat_no, segment_no, total_capacity
+        FROM stock_capacity
+        WHERE train_no = #{trainNo}
+        ORDER BY seat_no ASC, segment_no ASC
+    </select>
+
+</mapper>

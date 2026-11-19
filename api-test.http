@@ -1,0 +1,197 @@
+### 智慧城市交通系统 - 接口测试（IDEA HTTP Client，直接点绿色箭头运行）
+
+### 1. 注册（重复用户名会返回 400）
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "test01",
+  "password": "123456",
+  "nickname": "测试用户"
+}
+
+### 2. 登录（成功后自动把 access/refresh 令牌存入全局变量）
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "123456"
+}
+
+> {%
+client.global.set("access_token", response.body.data.accessToken);
+client.global.set("refresh_token", response.body.data.refreshToken);
+%}
+
+### 3. 获取当前登录用户信息（携带访问令牌）
+GET http://localhost:8080/api/auth/me
+Authorization: Bearer {{access_token}}
+
+### 4. 刷新令牌（旧 refresh 作废，新令牌写回变量）
+POST http://localhost:8080/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refresh_token}}"
+}
+
+> {%
+client.global.set("access_token", response.body.data.accessToken);
+client.global.set("refresh_token", response.body.data.refreshToken);
+%}
+
+### 5. 不带令牌访问受保护接口（预期返回 401）
+GET http://localhost:8080/api/auth/me
+
+### 6. 退出登录（注销访问令牌与刷新令牌）
+POST http://localhost:8080/api/auth/logout
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refresh_token}}"
+}
+
+### 7. 退出后再用旧令牌访问（预期 401，验证 Redis 已删除）
+GET http://localhost:8080/api/auth/me
+Authorization: Bearer {{access_token}}
+
+# ==========================================================
+# 售票模块：乘车人 + 余票查询（B2 统一库存）
+# 先执行上面的「登录」拿到 access_token，再跑下面的请求
+# ==========================================================
+
+### 8. 新增乘车人（乘车人一）
+POST http://localhost:8080/api/passengers
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "passengerName": "张三",
+  "idCard": "610101199001011234",
+  "passengerType": 1
+}
+
+> {%
+client.global.set("passenger_id", response.body.data.id);
+%}
+
+### 9. 重复添加同一身份证（预期 400：该身份证号已存在乘车人）
+POST http://localhost:8080/api/passengers
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "passengerName": "张三",
+  "idCard": "610101199001011234",
+  "passengerType": 1
+}
+
+### 10. 新增乘车人（乘车人二，用于多乘车人下单）
+POST http://localhost:8080/api/passengers
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "passengerName": "李四",
+  "idCard": "610101199002022345",
+  "passengerType": 1
+}
+
+> {%
+client.global.set("passenger_id_2", response.body.data.id);
+%}
+
+### 11. 查询我的乘车人列表（身份证应已脱敏）
+GET http://localhost:8080/api/passengers
+Authorization: Bearer {{access_token}}
+
+### 12. 统一预热 G1001 全部席别（先 DEL 旧 key，再写 stock Hash，6 条区段）
+POST http://localhost:8080/api/orders/preheat?trainNo=G1001
+Authorization: Bearer {{access_token}}
+
+### 13. 查余票：西安北→宝鸡南 全程二等座（第一次 data.source 应为 REDIS）
+GET http://localhost:8080/api/ticket/remain?trainNo=G1001&fromSeq=1&toSeq=3&seatNo=SECOND_CLASS
+Authorization: Bearer {{access_token}}
+
+### 14. 再查一次同一区间（1 秒内 data.source 应为 LOCAL，验证本地缓存）
+GET http://localhost:8080/api/ticket/remain?trainNo=G1001&fromSeq=1&toSeq=3&seatNo=SECOND_CLASS
+Authorization: Bearer {{access_token}}
+
+### 15. 查余票：咸阳秦都→宝鸡南 二等座（单区段，直接取该 field）
+GET http://localhost:8080/api/ticket/remain?trainNo=G1001&fromSeq=2&toSeq=3&seatNo=SECOND_CLASS
+Authorization: Bearer {{access_token}}
+
+### 16. 查不存在的车次（预期 400，验证缓存空值防穿透）
+GET http://localhost:8080/api/ticket/remain?trainNo=G9999&fromSeq=1&toSeq=3&seatNo=SECOND_CLASS
+Authorization: Bearer {{access_token}}
+
+# ==========================================================
+# 抢票下单（先记账后动钱：写流水 → 扣Redis → 建订单 → 扣DB库存）
+# 顺序：执行 sql/05_b2_unified_stock.sql → 预热 → 下单 → 查状态
+# ==========================================================
+
+### 17. 抢票成功（乘车人一，G1001 二等座全程，预期 status=已确认）
+POST http://localhost:8080/api/orders
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "passengerId": {{passenger_id}},
+  "trainNo": "G1001",
+  "seatNo": "SECOND_CLASS",
+  "fromSeq": 1,
+  "toSeq": 3
+}
+
+> {%
+client.global.set("order_no", response.body.data.orderNo);
+%}
+
+### 18. 按订单号查状态（预期 已确认）
+GET http://localhost:8080/api/orders/{{order_no}}
+Authorization: Bearer {{access_token}}
+
+### 19. 同一乘车人换席别再下单（预期 400：判重不分席别，该乘车人已买此车次）
+POST http://localhost:8080/api/orders
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "passengerId": {{passenger_id}},
+  "trainNo": "G1001",
+  "seatNo": "FIRST_CLASS",
+  "fromSeq": 1,
+  "toSeq": 2
+}
+
+### 20. 另一乘车人单区段下单（多乘车人各买一张，允许，预期成功）
+POST http://localhost:8080/api/orders
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "passengerId": {{passenger_id_2}},
+  "trainNo": "G1001",
+  "seatNo": "FIRST_CLASS",
+  "fromSeq": 2,
+  "toSeq": 3
+}
+
+### 21. 未预热车次下单（预期 400：库存未预热，流水已取消，不回补）
+POST http://localhost:8080/api/orders
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+  "passengerId": {{passenger_id_2}},
+  "trainNo": "G9999",
+  "seatNo": "SECOND_CLASS",
+  "fromSeq": 1,
+  "toSeq": 3
+}
+
+### 22. 删除乘车人
+DELETE http://localhost:8080/api/passengers/{{passenger_id}}
+Authorization: Bearer {{access_token}}

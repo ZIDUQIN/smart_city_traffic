@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartcity.traffic.mapper.TicketPriceMapper">
+
+    <resultMap id="priceResultMap" type="com.smartcity.traffic.entity.TicketPriceRecord">
+        <id column="id" property="id"/>
+        <result column="train_no" property="trainNo"/>
+        <result column="from_seq" property="fromSeq"/>
+        <result column="to_seq" property="toSeq"/>
+        <result column="seat_no" property="seatNo"/>
+        <result column="price" property="price"/>
+    </resultMap>
+
+    <select id="selectPrice" resultMap="priceResultMap">
+        SELECT id, train_no, from_seq, to_seq, seat_no, price
+        FROM ticket_price
+        WHERE train_no = #{trainNo}
+          AND from_seq = #{fromSeq}
+          AND to_seq = #{toSeq}
+          AND seat_no = #{seatNo}
+    </select>
+
+    <select id="selectByTrainNo" resultMap="priceResultMap">
+        SELECT id, train_no, from_seq, to_seq, seat_no, price
+        FROM ticket_price
+        WHERE train_no = #{trainNo}
+        ORDER BY from_seq ASC, to_seq ASC, seat_no ASC
+    </select>
+
+</mapper>

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartcity.traffic.mapper.TrainInstanceMapper">
+
+    <resultMap id="instanceResultMap" type="com.smartcity.traffic.entity.TrainInstanceRecord">
+        <id column="id" property="id"/>
+        <result column="instance_no" property="instanceNo"/>
+        <result column="train_no" property="trainNo"/>
+        <result column="travel_date" property="travelDate"/>
+        <result column="status" property="status"/>
+        <result column="stock_preheated" property="stockPreheated"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <sql id="baseColumns">
+        id, instance_no, train_no, travel_date, status, stock_preheated, create_time, update_time
+    </sql>
+
+    <select id="selectByInstanceNo" resultMap="instanceResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM train_instance
+        WHERE instance_no = #{instanceNo}
+    </select>
+
+    <select id="selectByTrainNoAndDate" resultMap="instanceResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM train_instance
+        WHERE train_no = #{trainNo}
+          AND travel_date = #{travelDate}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO train_instance
+            (instance_no, train_no, travel_date, status, stock_preheated, create_time, update_time)
+        VALUES
+            (#{instanceNo}, #{trainNo}, #{travelDate}, #{status}, #{stockPreheated},
+             #{createTime}, #{updateTime})
+    </insert>
+
+    <update id="markPreheated">
+        UPDATE train_instance
+        SET stock_preheated = 1,
+            update_time     = NOW()
+        WHERE instance_no = #{instanceNo}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE train_instance
+        SET status      = #{status},
+            update_time = NOW()
+        WHERE instance_no = #{instanceNo}
+    </update>
+
+    <select id="countInRange" resultType="long">
+        SELECT COUNT(*)
+        FROM train_instance
+        WHERE travel_date BETWEEN #{fromDate} AND #{toDate}
+    </select>
+
+    <select id="selectByDate" resultMap="instanceResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM train_instance
+        WHERE travel_date = #{travelDate}
+    </select>
+
+    <select id="selectExpired" resultMap="instanceResultMap">
+        SELECT <include refid="baseColumns"/>
+        FROM train_instance
+        WHERE travel_date &lt; #{cutoff}
+    </select>
+
+    <delete id="deleteByInstanceNo">
+        DELETE FROM train_instance
+        WHERE instance_no = #{instanceNo}
+    </delete>
+
+</mapper>

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧城市交通 · 车票预订</title>
+    <link rel="stylesheet" href="/css/style.css?v=10">
+</head>
+<body>
+
+<!-- ========== 登录页 ========== -->
+<section id="login-view" class="login-view">
+    <div class="login-card">
+        <div class="login-brand">
+            <span class="brand-mark">CT</span>
+            <div>
+                <h1 class="login-title">智慧城市交通</h1>
+                <p class="login-sub">车票预订系统</p>
+            </div>
+        </div>
+
+        <div id="login-panel">
+            <div class="field">
+                <label for="login-username">账号</label>
+                <input id="login-username" type="text" placeholder="请输入账号" autocomplete="username">
+            </div>
+            <div class="field">
+                <label for="login-password">密码</label>
+                <input id="login-password" type="password" placeholder="请输入密码" autocomplete="current-password">
+            </div>
+            <p id="login-error" class="form-error"></p>
+            <button id="btn-login" class="btn btn-primary btn-block">登录</button>
+            <div class="login-foot">
+                <span>没有账号？</span>
+                <button id="btn-to-register" class="link-btn">立即注册</button>
+            </div>
+            <p class="login-hint">演示账号：admin / 123456</p>
+        </div>
+
+        <div id="register-panel" class="hidden">
+            <div class="field">
+                <label for="reg-username">账号</label>
+                <input id="reg-username" type="text" placeholder="请输入账号">
+            </div>
+            <div class="field">
+                <label for="reg-password">密码</label>
+                <input id="reg-password" type="password" placeholder="请输入密码">
+            </div>
+            <div class="field">
+                <label for="reg-nickname">昵称</label>
+                <input id="reg-nickname" type="text" placeholder="请输入昵称">
+            </div>
+            <p id="register-error" class="form-error"></p>
+            <button id="btn-register" class="btn btn-primary btn-block">注册并登录</button>
+            <div class="login-foot">
+                <span>已有账号？</span>
+                <button id="btn-to-login" class="link-btn">返回登录</button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ========== 主框架 ========== -->
+<section id="app-view" class="app-view hidden">
+    <header class="topbar">
+        <div class="topbar-brand">
+            <span class="brand-mark brand-mark-sm">CT</span>
+            <span>车票预订</span>
+        </div>
+        <nav class="topbar-nav">
+            <button class="nav-item active" data-page="book">订票</button>
+            <button class="nav-item" data-page="orders">我的订单</button>
+            <button class="nav-item" data-page="passengers">乘车人</button>
+            <button class="nav-item" data-page="ops">运维</button>
+        </nav>
+        <div class="topbar-user">
+            <span id="current-user" class="user-name"></span>
+            <button id="btn-logout" class="link-btn">退出</button>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <!-- 订票页 -->
+        <section id="page-book" class="page">
+            <!-- 方言语音入口：老人第一眼就能看到 -->
+            <div class="voice-banner">
+                <div class="voice-banner-text">
+                    <strong>说不来普通话？说家乡话也能买票</strong>
+                    <span>四川话、关中话都听得懂，按住说一句就行</span>
+                </div>
+                <button id="btn-voice" class="btn btn-primary voice-banner-btn">按住说话</button>
+            </div>
+
+            <div class="search-card">
+                <div class="search-row">
+                    <div class="station-field">
+                        <label for="from-station">出发</label>
+                        <div class="combo">
+                            <input id="from-station" placeholder="出发站" autocomplete="off">
+                            <button type="button" id="from-station-arrow" class="combo-arrow" aria-label="展开车站列表" tabindex="-1">▾</button>
+                            <div id="from-station-panel" class="combo-panel hidden"></div>
+                        </div>
+                    </div>
+                    <button id="btn-swap" class="swap-btn" title="交换出发与到达">⇄</button>
+                    <div class="station-field">
+                        <label for="to-station">到达</label>
+                        <div class="combo">
+                            <input id="to-station" placeholder="到达站" autocomplete="off">
+                            <button type="button" id="to-station-arrow" class="combo-arrow" aria-label="展开车站列表" tabindex="-1">▾</button>
+                            <div id="to-station-panel" class="combo-panel hidden"></div>
+                        </div>
+                    </div>
+                    <button id="btn-search" class="btn btn-primary btn-lg">查询车次</button>
+                </div>
+                <div id="date-bar" class="date-bar"></div>
+                <div class="hot-routes">
+                    <span class="hot-label">热门线路</span>
+                    <div id="hot-routes" class="hot-list"></div>
+                </div>
+            </div>
+
+            <div id="train-list" class="train-list">
+                <div class="empty-tip">请选择出发站、到达站和日期后查询</div>
+            </div>
+        </section>
+
+        <!-- 我的订单 -->
+        <section id="page-orders" class="page hidden">
+            <div class="page-head">
+                <h2>我的订单</h2>
+                <button id="btn-refresh-orders" class="btn btn-ghost">刷新</button>
+            </div>
+            <div id="order-tabs" class="tabs"></div>
+            <div id="order-list" class="order-list"></div>
+        </section>
+
+        <!-- 乘车人 -->
+        <section id="page-passengers" class="page hidden">
+            <div class="page-head">
+                <h2>常用乘车人</h2>
+                <div class="head-actions">
+                    <input id="passenger-search" class="search-input" placeholder="搜索姓名或证件后四位">
+                    <button id="btn-add-passenger" class="btn btn-primary">新增乘车人</button>
+                </div>
+            </div>
+            <div id="passenger-list" class="passenger-list"></div>
+        </section>
+
+        <!-- 运维面板 -->
+        <section id="page-ops" class="page hidden">
+            <div class="page-head">
+                <h2>运维面板</h2>
+                <p class="page-desc">实例窗口、库存预热、过期清理，普通购票不需要这些操作。</p>
+            </div>
+            <div class="ops-grid">
+                <div class="ops-card">
+                    <h3>实例窗口</h3>
+                    <div class="ops-row">
+                        <input id="ops-train-no" placeholder="车次号，如 G652">
+                        <input id="ops-days" type="number" value="7" min="1" max="7" class="ops-num">
+                        <button id="btn-ops-window" class="btn btn-ghost">查询</button>
+                    </div>
+                    <div id="ops-window-result" class="ops-result"></div>
+                </div>
+                <div class="ops-card">
+                    <h3>手工预热实例</h3>
+                    <div class="ops-row">
+                        <input id="ops-preheat-instance" placeholder="实例号，如 G652-20261117">
+                        <button id="btn-ops-preheat" class="btn btn-ghost">预热</button>
+                    </div>
+                    <p id="ops-preheat-result" class="ops-result"></p>
+                </div>
+                <div class="ops-card">
+                    <h3>补齐滚动窗口</h3>
+                    <div class="ops-row">
+                        <button id="btn-ops-ensure" class="btn btn-ghost">补齐未来 7 天</button>
+                    </div>
+                    <p id="ops-ensure-result" class="ops-result"></p>
+                </div>
+                <div class="ops-card">
+                    <h3>清理过期实例</h3>
+                    <div class="ops-row">
+                        <input id="ops-delay" type="number" value="2" min="0" class="ops-num">
+                        <button id="btn-ops-cleanup" class="btn btn-ghost">清理</button>
+                    </div>
+                    <p id="ops-cleanup-result" class="ops-result"></p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+</section>
+
+<!-- ========== 确认订单弹窗 ========== -->
+<div id="order-modal" class="modal-mask hidden">
+    <div class="modal">
+        <div class="modal-head">
+            <h3>确认订单</h3>
+            <button class="modal-close" data-close="order-modal" aria-label="关闭">×</button>
+        </div>
+        <div class="modal-body">
+            <div id="order-summary" class="order-summary"></div>
+            <div class="section-title">选择乘车人<span class="title-tip">可多选，同一订单一起出票</span></div>
+            <input id="order-passenger-search" class="search-input" placeholder="搜索姓名或证件后四位">
+            <div id="order-passenger-list" class="select-list"></div>
+            <div id="order-no-passenger" class="empty-tip hidden">
+                还没有乘车人，<button id="btn-goto-passenger" class="link-btn">去添加</button>
+            </div>
+            <p id="order-error" class="form-error"></p>
+        </div>
+        <div class="modal-foot">
+            <div class="total">合计 <span id="order-total">¥0.00</span><em id="order-count" class="total-sub"></em></div>
+            <button id="btn-submit-order" class="btn btn-primary">提交订单</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== 支付弹窗 ========== -->
+<div id="pay-modal" class="modal-mask hidden">
+    <div class="modal modal-sm">
+        <div class="modal-head">
+            <h3>收银台</h3>
+            <button class="modal-close" data-close="pay-modal" aria-label="关闭">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="pay-amount">¥<span id="pay-amount">0.00</span></div>
+            <div class="pay-ticket-count" id="pay-ticket-count"></div>
+            <div class="pay-meta">
+                <p>订单号 <span id="pay-order-no" class="mono"></span></p>
+                <p>请在 <span id="pay-countdown" class="countdown">15:00</span> 内完成支付，超时订单将自动取消</p>
+            </div>
+            <div id="pay-status" class="pay-status"></div>
+        </div>
+        <div class="modal-foot">
+            <button id="btn-confirm-pay" class="btn btn-primary btn-block">确认支付</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== 乘车人弹窗 ========== -->
+<div id="passenger-modal" class="modal-mask hidden">
+    <div class="modal modal-sm">
+        <div class="modal-head">
+            <h3 id="passenger-modal-title">新增乘车人</h3>
+            <button class="modal-close" data-close="passenger-modal" aria-label="关闭">×</button>
+        </div>
+        <div class="modal-body">
+            <div class="field">
+                <label for="p-name">姓名</label>
+                <input id="p-name" type="text" placeholder="与证件一致">
+            </div>
+            <div class="field">
+                <label for="p-idcard">身份证号</label>
+                <input id="p-idcard" type="text" placeholder="18 位身份证号">
+            </div>
+            <div class="field">
+                <label for="p-type">乘客类型</label>
+                <select id="p-type">
+                    <option value="1">成人</option>
+                    <option value="2">学生</option>
+                    <option value="3">儿童</option>
+                </select>
+            </div>
+            <p id="passenger-error" class="form-error"></p>
+        </div>
+        <div class="modal-foot">
+            <button id="btn-save-passenger" class="btn btn-primary btn-block">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== 退票弹窗 ========== -->
+<div id="refund-modal" class="modal-mask hidden">
+    <div class="modal modal-sm">
+        <div class="modal-head">
+            <h3>申请退票</h3>
+            <button class="modal-close" data-close="refund-modal" aria-label="关闭">×</button>
+        </div>
+        <div class="modal-body">
+            <div id="refund-info" class="refund-info"></div>
+            <div class="field">
+                <label for="refund-reason">退票原因（可选）</label>
+                <input id="refund-reason" type="text" placeholder="如：行程变更">
+            </div>
+            <p id="refund-error" class="form-error"></p>
+        </div>
+        <div class="modal-foot">
+            <button id="btn-submit-refund" class="btn btn-danger btn-block">确认退票</button>
+        </div>
+    </div>
+</div>
+
+<!-- ========== 方言语音面板（全屏弹层） ========== -->
+<div id="voice-modal" class="voice-mask hidden">
+    <div class="voice-panel">
+        <div class="voice-head">
+            <span class="voice-title">说方言订票</span>
+            <div class="voice-tools">
+                <button id="voice-dialect" class="voice-chip">方言：自动</button>
+                <button id="voice-tts" class="voice-chip">播报：开</button>
+                <button id="voice-close" class="voice-close" aria-label="关闭">×</button>
+            </div>
+        </div>
+
+        <div class="voice-body">
+            <div id="voice-chat" class="voice-chat"></div>
+            <div class="voice-stage">
+                <div id="voice-hint" class="voice-hint">按住下面的圆钮，说您要去哪儿</div>
+                <div id="voice-candidates" class="voice-candidates hidden"></div>
+                <div id="voice-trains" class="voice-trains hidden"></div>
+                <div id="voice-passengers" class="voice-passengers hidden"></div>
+                <div id="voice-confirm-card" class="voice-confirm-card hidden"></div>
+                <div id="voice-fallback" class="voice-fallback hidden"></div>
+                <div id="voice-typing" class="voice-typing hidden">
+                    <input id="voice-type-input" type="text" placeholder="也可以打字，例如：明天从西安去北京">
+                    <button id="voice-type-send" class="btn btn-primary">发送</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="voice-foot">
+            <div id="voice-actions" class="voice-actions hidden">
+                <button id="voice-yes" class="btn btn-primary voice-big">就买这趟</button>
+                <button id="voice-tomorrow" class="btn btn-primary voice-big hidden">看看明天的</button>
+                <button id="voice-no" class="btn btn-ghost voice-big">不对，重说</button>
+            </div>
+            <button id="voice-mic" class="voice-mic">按住说话</button>
+            <div id="voice-timer" class="voice-timer"></div>
+            <button id="voice-type-toggle" class="voice-type-toggle">不方便说？改成打字</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="/js/app.js?v=7"></script>
+<script src="/js/voice.js?v=11"></script>
+</body>
+</html>

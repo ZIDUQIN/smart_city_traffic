@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartcity.traffic.mapper.SysUserMapper">
+
+    <resultMap id="sysUserResultMap" type="com.smartcity.traffic.entity.SysUser">
+        <id column="id" property="id"/>
+        <result column="username" property="username"/>
+        <result column="password" property="password"/>
+        <result column="nickname" property="nickname"/>
+        <result column="status" property="status"/>
+        <result column="role" property="role"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <select id="selectByUsername" resultMap="sysUserResultMap">
+        SELECT id, username, password, nickname, status, role, create_time, update_time
+        FROM sys_user
+        WHERE username = #{username}
+        LIMIT 1
+    </select>
+
+    <select id="countByUsername" resultType="int">
+        SELECT COUNT(1)
+        FROM sys_user
+        WHERE username = #{username}
+    </select>
+
+    <insert id="insert" parameterType="com.smartcity.traffic.entity.SysUser">
+        INSERT INTO sys_user (id, username, password, nickname, status, role)
+        VALUES (#{id}, #{username}, #{password}, #{nickname}, #{status}, #{role})
+    </insert>
+
+</mapper>

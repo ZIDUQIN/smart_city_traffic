@@ -1,0 +1,219 @@
+server:
+  port: 8081
+  tomcat:
+    # 工作线程：默认 200，瞬时并发时加大，避免请求排队
+    threads:
+      max: 400
+      min-spare: 20
+    # 连接积压队列：默认 100，200 并发瞬间打满会拒绝连接，加大到 500
+    accept-count: 500
+    # 最大同时连接数
+    max-connections: 1000
+
+spring:
+  application:
+    name: smart-city-traffic
+
+  # 上传：语音音频只在内存里处理，不落临时文件。
+  # file-size-threshold 默认是 0，含义是"任何上传都先写磁盘"，等于把录音在 /tmp 留一份。
+  servlet:
+    multipart:
+      # 阈值与音频上限（2MB）对齐：≤2MB 的录音全程在内存里
+      file-size-threshold: 2097152
+      # 留一倍余量：超限由业务层给友好提示，不让容器直接抛 500
+      max-file-size: 4MB
+      max-request-size: 8MB
+
+  # 本地密钥：application-local.yml 存在就覆盖下面的空占位，不存在也不报错。
+  # 真实密钥只放在那个文件里，它已被 .gitignore 忽略，不会进版本库。
+  config:
+    import: optional:classpath:application-local.yml
+
+  # Spring AI：只启用对话模型，语音/图像/向量/审核一律关闭。
+  # 开关是 spring.ai.model.<能力>，值为提供方名（openai）或 none；
+  # 被启用却缺少凭据的模型会在启动时直接抛 BeanCreationException。
+  # 真实 key 走环境变量 DEEPSEEK_API_KEY（或 application-local.yml），禁止提交到 git。
+  ai:
+    model:
+      chat: openai
+      embedding: none
+      image: none
+      moderation: none
+      audio:
+        speech: none
+        transcription: none
+    openai:
+      # DeepSeek 走 OpenAI 兼容协议接入：
+      # base-url 必须写到 /v1 为止（SDK 会在此基础上再拼 /chat/completions），
+      # 写成 /v1/v1 会 404。
+      # api-key 不能为空，否则对话模型在启动时就会因缺少凭据而创建失败。
+      # 默认值是占位符而不是真实 key：没配 DEEPSEEK_API_KEY 时应用能正常启动，
+      # 语音模块的模型兜底会在调用失败后自动降级为纯规则，不影响其他功能。
+      # 只允许通过环境变量注入真实 key；这里的默认值必须是明显占位符，
+      # 防止有人把真实 key 写进主配置后随仓库一起提交。
+      api-key: ${DEEPSEEK_API_KEY:sk-REPLACE_WITH_YOUR_KEY}
+      base-url: https://api.deepseek.com/v1
+      chat:
+        model: deepseek-chat
+        options:
+          # 站名兜底要的是稳定复现的答案，不需要"发挥"：温度必须压到 0
+          temperature: 0
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/smart-city-traffic?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: root
+    password: 123456
+    hikari:
+      # 连接池默认只有 10，200 并发下大量请求等连接，调大到 30
+      maximum-pool-size: 30
+      minimum-idle: 10
+      connection-timeout: 5000
+
+  data:
+    redis:
+      # 单实例写法（已切换为集群，保留备查；两者只能生效其一）
+      # host: 192.168.175.100
+      # port: 6379
+      # database: 0
+      # 集群写法：6 个节点（3 主 3 从），客户端会自动发现槽位分布并按槽路由
+      cluster:
+        nodes:
+          - 192.168.175.100:7000
+          - 192.168.175.100:7001
+          - 192.168.175.100:7002
+          - 192.168.175.100:7003
+          - 192.168.175.100:7004
+          - 192.168.175.100:7005
+        # 槽位重定向最多跳几次，防止节点间槽信息不一致时死循环
+        max-redirects: 3
+      password:
+      timeout: 5000ms
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.smartcity.traffic.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+# 班次实例滚动窗口
+traffic:
+  instance:
+    # 窗口天数（含今天）：每天 0 点后自动把最后一天补上，滚动向前
+    window-days: 7
+    # 过期实例延迟清理天数：运营日期早于 (今天 - 该值) 才删，
+    # 留缓冲是为了退款/对账还能查到当天之后的订单
+    cleanup-delay-days: 2
+
+# RocketMQ 事务消息（本地用 docker compose 起，见 deploy/rocketmq/docker-compose.yml）
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer-group: smart-city-traffic-tx-producer
+  consumer-group: smart-city-traffic-tx-consumer
+  compensate-group: smart-city-traffic-compensate-producer
+  topic: ticket-order-transaction-topic
+
+# 模拟支付渠道配置
+pay:
+  mock:
+    hmac-secret: smart_city_mock_secret_2026
+    # 回调地址跟随本实例端口：多实例部署时各自回调自己，避免全部打到 8081
+    notify-url: http://localhost:${server.port}/api/pay/notify
+    timeout-seconds: 900
+
+# 退票退款配置
+refund:
+  # 手续费比例，实退 = 订单金额 * (1 - fee-rate)
+  # 真实 12306 按开车前时间阶梯（8天5% / 48h10% / 24h20% / 24h内50%），
+  # 本项目 Train 只有 LocalTime 没有日期维度，做不了阶梯，先用固定比例，费率留可配
+  fee-rate: 0.00
+  # 退款回调地址，与支付回调分开；同样跟随本实例端口
+  notify-url: http://localhost:${server.port}/api/pay/refund/notify
+  # 退款回调延迟（秒）。正常情况保持 0：渠道立即回调，退款瞬间完成。
+  # 只有在需要观察「退款中」中间态（演示异步流程）时才临时调大。
+  mock:
+    callback-delay-seconds: 0
+  # 退款对账任务（每分钟扫一次，补偿卡在「退款中」的记录）
+  reconcile:
+    # 停在「退款中」超过多少秒才纳入对账（同时也是重试间隔，每轮会刷新 update_time）
+    timeout-seconds: 300
+    # 单条最多自动处理几轮，到阈值只告警不自动处理
+    max-retry: 5
+    # 每轮最多处理多少条
+    batch-size: 20
+    # 账龄闸门：退款单创建超过多少小时，即使渠道"查不到"也不许重发
+    # 渠道流水一般只保留几个月，单子太老查不到时"请求没到"的假设不成立，
+    # 重发会重复退款，只能转人工。退款正常几小时到几天就到账，7 天还没结果必是异常
+    max-age-hours: 168
+
+# 方言语音购票（老人说方言也能把票买对）
+voice:
+  # 可售日期窗口（天，含今天）。直接引用班次实例窗口，两者必须对齐：
+  # 语音放 15 天但库里只生成 7 天实例，第 8 天就是"查不到车"的空窗
+  window-days: ${traffic.instance.window-days:7}
+  asr:
+    # mock：不调外部服务，把 debugText 当识别结果，用于本地跑通全链路
+    # xfyun：讯飞「语音听写大模型（中英）V2.0」，方言免切、202 种方言自动判别
+    # aliyun：预留适配器，暂未实现
+    provider: xfyun
+    # 音频时长上限（秒），超过直接拒绝
+    max-duration-seconds: 30
+    # 音频体积上限（字节）：2MB
+    max-bytes: 2097152
+  xfyun:
+    # 密钥不写在主配置里（这个文件要进版本库）。
+    # 本机开发：真实值见 application-local.yml（已被 .gitignore 忽略）。
+    # 服务器部署：改用环境变量 XFYUN_APP_ID / XFYUN_API_KEY / XFYUN_API_SECRET。
+    app-id: ${XFYUN_APP_ID:}
+    api-key: ${XFYUN_API_KEY:}
+    api-secret: ${XFYUN_API_SECRET:}
+    # 大模型版地址（不是老版 /v2/iat）：方言由服务端自动判别，accent 只能填 mandarin
+    host: wss://iat.cn-huabei-1.xf-yun.com/v1
+    # 把 61 个站名作为热词送进识别端（context.bias.hotword），提升站名等专有名词的准确率
+    hotwords: true
+  rate-limit:
+    # 单用户每分钟最多几次语音请求（识别+解析各算一次）
+    # 走 Redis 计数，多实例部署下额度一致；失败/没听清的不计入
+    per-user-per-minute: 10
+    # 全局日调用上限：外部 ASR 按次计费，到量就停，直接降级到打字/句式按钮
+    daily-quota: 5000
+    # 日额度消耗到该比例先告警（0.8 = 80%）
+    daily-alert-ratio: 0.8
+  llm:
+    # 站名兜底：只在本地规则"拿不准"时才调模型，候选清晰时一次都不调。
+    # 关掉它系统照常跑，只是同音错字这类场景会退回"让用户点一下"
+    enabled: ${VOICE_LLM_ENABLED:true}
+    # 单次最多等几秒：超时立刻降级回规则结果，不能让用户干等
+    # 未配置 DEEPSEEK_API_KEY 时调用会 401，同样按失败降级，不影响查票
+    timeout-seconds: 3
+    model: deepseek-chat
+
+# 下单接口限流（令牌桶，两层）
+rate-limit:
+  # 内层：单用户限流（按 用户+车次 维度）
+  # 桶容量：允许的突发下单次数，连点几下全放行
+  capacity: 3
+  # 每秒补充的令牌数：稳态放行速率（每秒最多 1 单）
+  refill-per-second: 1
+  # 外层：全局限流（按车次维度），保护系统入口容量
+  # 容量 500 参照写链路实测 451 TPS 取略高值；压测需 0 错误时临时调高到 10000
+  global:
+    capacity: 500
+    refill-per-second: 500
+
+# 监控端点：浏览器直接访问 /actuator/metrics 看指标，/actuator/health 看存活
+management:
+  endpoints:
+    web:
+      exposure:
+        # 只暴露这三个。env、beans、configprops 这类会把配置和 Bean 全吐出来，本地也别开
+        include: health,info,metrics
+  endpoint:
+    health:
+      # 显示 DB、Redis、磁盘等各组件的明细状态，排障时一眼看出是哪个外部依赖挂了
+      show-details: always
+  metrics:
+    tags:
+      # 给所有指标打上应用名，以后接 Prometheus 多实例时能区分数据来源
+      application: smart-city-traffic
+

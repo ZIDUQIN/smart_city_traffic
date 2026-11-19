@@ -1,0 +1,31 @@
+id	category	dialect	text	audio	expect_outcome	expect_from	expect_to	expect_day	expect_count	expect_seat	note
+01	full	mandarin	我明儿个从西安北去北京西，两张		OK	西安北	北京西	1	2	SECOND_CLASS	M4 已实测 6 趟车
+02	full	mandarin	我明天从西安北到华山北，买一张一等座		OK	西安北	华山北	1	1	FIRST_CLASS	12 趟
+03	full	mandarin	后天从西安北去郑州东，三张		OK	西安北	郑州东	2	3	SECOND_CLASS	9 趟
+04	full	mandarin	今天从西安北去上海虹桥，五张		OK	西安北	上海虹桥	0	5	SECOND_CLASS	8 趟，同时踩人数上限边界
+05	full	mandarin	大后天从西安北到太原南，一张		OK	西安北	太原南	3	1	SECOND_CLASS	8 趟
+06	full	mandarin	从西安北去兰州西，两张二等座		OK	西安北	兰州西	0	2	SECOND_CLASS	7 趟
+07	full	mandarin	明天从北京西到石家庄，一张		OK	北京西	石家庄	1	1	SECOND_CLASS	11 趟
+08	typo	mandarin	我明儿个从西岸去北金西，两张		OK	西安北	北京西	1	2	SECOND_CLASS	同音错字，靠车次反查定站
+09	typo	mandarin	从西安北去上海红桥，一张		OK	西安北	上海虹桥	0	1	SECOND_CLASS	红桥到虹桥
+10	typo	mandarin	从西安北去正州东，两张		OK	西安北	郑州东	0	2	SECOND_CLASS	正州到郑州
+11	typo	mandarin	从西安北去北金西，一张		OK	西安北	北京西	0	1	SECOND_CLASS	北金到北京
+12	typo	mandarin	从西安北去兰洲西，两张		OK	西安北	兰州西	0	2	SECOND_CLASS	兰洲到兰州
+13	typo	mandarin	从西安北去太远南，一张		OK	西安北	太原南	0	1	SECOND_CLASS	太远到太原
+14	missing_from	mandarin	我要去北京		STATION_UNCONFIRMED		北京#	0	1	SECOND_CLASS	北京南与北京西分不开，必须问出发站
+15	missing_from	mandarin	去西安		STATION_UNCONFIRMED		西安北#	0	1	SECOND_CLASS	西安三站，且没有名叫西安的站
+16	missing_from	mandarin	到郑州东，后天，两张		STATION_UNCONFIRMED		郑州东	2	2	SECOND_CLASS	只给到达站
+17	missing_from	mandarin	往广州南		STATION_UNCONFIRMED		广州南	0	1	SECOND_CLASS	只给到达站
+18	date	mandarin	下个月10号从西安北去北京西		DATE_OUT_OF_WINDOW			0	1	SECOND_CLASS	超出 7 天窗口
+19	date	mandarin	这周五从西安北去北京西，一张		OK	西安北	北京西	3	1	SECOND_CLASS	本周五即 11-20，窗口内
+20	date	mandarin	11月20号从西安北去华山北		OK	西安北	华山北	3	1	SECOND_CLASS	窗口内最后一天
+21	count	mandarin	六张从西安北去北京西		TOO_MANY			0	6	SECOND_CLASS	超上限，应回 400
+22	count	mandarin	两张从西安北去北京西		OK	西安北	北京西	0	2	SECOND_CLASS	正常多人
+23	seat	mandarin	从西安北去北京西，要一等座		OK	西安北	北京西	0	1	FIRST_CLASS	指定一等座
+24	seat	mandarin	从西安北去北京西，最便宜的		OK	西安北	北京西	0	1	SECOND_CLASS	最便宜映射到二等座
+25	seat	mandarin	从西安北去北京西，商务座两张		OK	西安北	北京西	0	2	BUSINESS	指定商务座
+26	noise	mandarin	随便说说		STATION_UNCONFIRMED			0	1	SECOND_CLASS	无方向词，应进入兜底
+27	noise	mandarin	今天天气不错		STATION_UNCONFIRMED			0	1	SECOND_CLASS	剥掉今天后无有效站名
+28	noise	mandarin	我想买张票		STATION_UNCONFIRMED			0	1	SECOND_CLASS	全是客套话，没有方向
+29	dialect	guanzhong	额明儿个从西安北到北京西，要两张		OK	西安北	北京西	1	2	SECOND_CLASS	关中话写法，音频待录
+30	dialect	guanzhong	额要去北金西		STATION_UNCONFIRMED		北京#	0	1	SECOND_CLASS	关中话，缺出发站

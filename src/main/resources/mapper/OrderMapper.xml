@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartcity.traffic.mapper.OrderMapper">
+
+    <resultMap id="orderResultMap" type="com.smartcity.traffic.entity.OrderRecord">
+        <id column="id" property="id"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="user_id" property="userId"/>
+        <result column="passenger_id" property="passengerId"/>
+        <result column="train_no" property="trainNo"/>
+        <result column="instance_no" property="instanceNo"/>
+        <result column="travel_date" property="travelDate"/>
+        <result column="seat_no" property="seatNo"/>
+        <result column="from_seq" property="fromSeq"/>
+        <result column="to_seq" property="toSeq"/>
+        <result column="amount" property="amount"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.smartcity.traffic.entity.OrderRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO `order` (order_no, user_id, passenger_id, train_no, instance_no, travel_date, seat_no,
+                             from_seq, to_seq, amount, status, create_time, update_time)
+        VALUES (#{orderNo}, #{userId}, #{passengerId}, #{trainNo}, #{instanceNo}, #{travelDate}, #{seatNo},
+                #{fromSeq}, #{toSeq}, #{amount}, #{status}, #{createTime}, #{updateTime})
+    </insert>
+
+    <select id="selectByOrderNo" resultMap="orderResultMap">
+        SELECT id, order_no, user_id, passenger_id, train_no, instance_no, travel_date, seat_no,
+               from_seq, to_seq, amount, status, create_time, update_time
+        FROM `order`
+        WHERE order_no = #{orderNo}
+    </select>
+
+    <select id="selectByUserId" resultMap="orderResultMap">
+        SELECT id, order_no, user_id, passenger_id, train_no, instance_no, travel_date, seat_no,
+               from_seq, to_seq, amount, status, create_time, update_time
+        FROM `order`
+        WHERE user_id = #{userId}
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="listTimeoutConfirmed" resultMap="orderResultMap">
+        SELECT id, order_no, user_id, passenger_id, train_no, instance_no, travel_date, seat_no,
+               from_seq, to_seq, amount, status, create_time, update_time
+        FROM `order`
+        WHERE status = '已确认'
+          AND TIMESTAMPDIFF(SECOND, create_time, NOW()) &gt; #{timeoutSeconds}
+        ORDER BY create_time ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="casUpdateStatus">
+        UPDATE `order`
+        SET status      = #{newStatus},
+            update_time = NOW()
+        WHERE order_no = #{orderNo}
+          AND status = #{expectStatus}
+    </update>
+
+</mapper>

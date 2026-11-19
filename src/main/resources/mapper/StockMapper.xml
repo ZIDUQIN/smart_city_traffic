@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartcity.traffic.mapper.StockMapper">
+
+    <resultMap id="stockResultMap" type="com.smartcity.traffic.entity.StockRecord">
+        <id column="id" property="id"/>
+        <result column="train_no" property="trainNo"/>
+        <result column="seat_no" property="seatNo"/>
+        <result column="segment_no" property="segmentNo"/>
+        <result column="remain" property="remain"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <select id="selectByInstanceNoAndSeatNo" resultMap="stockResultMap">
+        SELECT id, train_no, seat_no, segment_no, remain, update_time
+        FROM stock
+        WHERE instance_no = #{instanceNo}
+          AND seat_no = #{seatNo}
+        ORDER BY segment_no ASC
+    </select>
+
+    <select id="selectByInstanceNo" resultMap="stockResultMap">
+        SELECT id, train_no, seat_no, segment_no, remain, update_time
+        FROM stock
+        WHERE instance_no = #{instanceNo}
+        ORDER BY seat_no ASC, segment_no ASC
+    </select>
+
+    <update id="deductOneSegment">
+        UPDATE stock
+        SET remain      = remain - 1,
+            update_time = NOW()
+        WHERE instance_no = #{instanceNo}
+          AND seat_no = #{seatNo}
+          AND segment_no = #{segmentNo}
+          AND remain &gt; 0
+    </update>
+
+    <!-- 回补不是裸加一：join 容量表并把结果卡在总容量以内。
+         影响 0 行有两种可能——行不存在，或者这一格已经顶到总容量。
+         调用方必须当成"拒绝回补"处理并告警，绝不能当成功继续往下走。 -->
+    <update id="restoreOneSegment">
+        UPDATE stock s
+            JOIN stock_capacity c
+              ON c.train_no = s.train_no
+             AND c.seat_no = s.seat_no
+             AND c.segment_no = s.segment_no
+        SET s.remain      = s.remain + 1,
+            s.update_time = NOW()
+        WHERE s.instance_no = #{instanceNo}
+          AND s.seat_no = #{seatNo}
+          AND s.segment_no = #{segmentNo}
+          AND s.remain &lt; c.total_capacity
+    </update>
+
+    <!-- 回补幂等标记：唯一键 (order_no, seat_no, segment_no) 冲突时 IGNORE 返回 0。
+         返回 1 才是第一次补，返回 0 说明这一段之前补过了。 -->
+    <insert id="insertRestoreRecord">
+        INSERT IGNORE INTO stock_restore_record (order_no, seat_no, segment_no)
+        VALUES (#{orderNo}, #{seatNo}, #{segmentNo})
+    </insert>
+
+    <!-- 巡检①：库存越界。近两天动过的行里，remain 超过总容量的全部揪出来。 -->
+    <select id="selectOverCapacity" resultType="java.util.Map">
+        SELECT s.instance_no AS instanceNo,
+               s.seat_no     AS seatNo,
+               s.segment_no  AS segmentNo,
+               s.remain      AS remain,
+               c.total_capacity AS capacity
+        FROM stock s
+                 JOIN stock_capacity c
+                      ON c.train_no = s.train_no
+                     AND c.seat_no = s.seat_no
+                     AND c.segment_no = s.segment_no
+        WHERE s.remain &gt; c.total_capacity
+          AND s.update_time &gt;= DATE_SUB(NOW(), INTERVAL 2 DAY)
+        LIMIT 200
+    </select>
+
+    <!-- 巡检②：库存漂移，用独立基准说话。
+         基准 = 总容量 − 该区段当前占用的订单数（已确认 + 已支付，区间覆盖本段）。
+         订单表 `order` 自带 instance_no，按实例精确关联，不靠时间推日期。
+         这个等式以前没有任何地方在算，所以"订单与库存互相对不上"这种矛盾系统自己不知道。 -->
+    <select id="selectRemainDrift" resultType="java.util.Map">
+        SELECT x.instanceNo, x.seatNo, x.segmentNo, x.remain, x.expectRemain
+        FROM (
+            SELECT s.instance_no AS instanceNo,
+                   s.seat_no     AS seatNo,
+                   s.segment_no  AS segmentNo,
+                   s.remain      AS remain,
+                   c.total_capacity - (
+                       SELECT COUNT(*)
+                       FROM `order` o
+                       WHERE o.instance_no = s.instance_no
+                         AND o.seat_no = s.seat_no
+                         AND o.from_seq &lt;= s.segment_no
+                         AND o.to_seq &gt; s.segment_no
+                         AND o.status IN ('已确认', '已支付')
+                   ) AS expectRemain
+            FROM stock s
+                     JOIN stock_capacity c
+                          ON c.train_no = s.train_no
+                         AND c.seat_no = s.seat_no
+                         AND c.segment_no = s.segment_no
+            WHERE s.update_time &gt;= DATE_SUB(NOW(), INTERVAL 2 DAY)
+        ) x
+        WHERE x.remain &lt;&gt; x.expectRemain
+        LIMIT 200
+    </select>
+
+    <insert id="insertOne">
+        INSERT INTO stock (instance_no, train_no, train_no_v2, seat_no, segment_no, remain, update_time)
+        VALUES (#{instanceNo}, #{trainNo}, #{trainNo}, #{seatNo}, #{segmentNo}, #{remain}, NOW())
+    </insert>
+
+    <delete id="deleteByInstanceNo">
+        DELETE FROM stock
+        WHERE instance_no = #{instanceNo}
+    </delete>
+
+</mapper>

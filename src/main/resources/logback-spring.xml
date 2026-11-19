@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  日志配置：
+  - 控制台保留，IDEA 里照旧能看
+  - logs/app.log 全量，按天滚动，留 7 天
+  - logs/alarm.log 只收告警（AlarmService 的 ERROR），单独一份便于排查和验证
+
+  为什么告警要单独一份：对账补偿失败这类问题，混在全量日志里很容易被淹掉；
+  而且验证脚本要断言"告警有没有发、发了几次"，单独文件才好定位。
+-->
+<configuration>
+
+    <!--
+      引入 Spring Boot 自带的 defaults.xml：它注册了 %clr 颜色转换器，并定义了带颜色的
+      CONSOLE_LOG_PATTERN。不引这一句，控制台就没有彩色标记了——颜色是 Boot 提供的，
+      不是 logback 原生能力。
+    -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- 日志目录可用 -DLOG_HOME 覆盖。多实例同时跑时必须分开，
+         否则两个进程写同一个文件会互相覆盖、滚动也失效 -->
+    <property name="LOG_HOME" value="${LOG_HOME:-logs}"/>
+    <!-- 文件用纯文本 pattern：%clr 写进文件只会变成 ANSI 转义乱码 -->
+    <property name="FILE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="APP_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/app.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/app.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${FILE_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <appender name="ALARM_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/alarm.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/alarm.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${FILE_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 告警单独落一份；additivity 保持 true，全量日志里也留痕，便于顺着时间线排查 -->
+    <logger name="com.smartcity.traffic.common.AlarmService" level="ERROR">
+        <appender-ref ref="ALARM_FILE"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="APP_FILE"/>
+    </root>
+
+</configuration>

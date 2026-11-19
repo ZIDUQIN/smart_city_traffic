@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartcity.traffic.mapper.RefundRecordMapper">
+
+    <resultMap id="refundResultMap" type="com.smartcity.traffic.entity.RefundRecord">
+        <id column="id" property="id"/>
+        <result column="refund_no" property="refundNo"/>
+        <result column="order_no" property="orderNo"/>
+        <result column="payment_no" property="paymentNo"/>
+        <result column="user_id" property="userId"/>
+        <result column="amount" property="amount"/>
+        <result column="fee" property="fee"/>
+        <result column="refund_amount" property="refundAmount"/>
+        <result column="status" property="status"/>
+        <result column="channel_refund_no" property="channelRefundNo"/>
+        <result column="reason" property="reason"/>
+        <result column="callback_count" property="callbackCount"/>
+        <result column="stock_restored" property="stockRestored"/>
+        <result column="retry_count" property="retryCount"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.smartcity.traffic.entity.RefundRecord"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO refund_record (refund_no, order_no, payment_no, user_id, amount, fee,
+                                   refund_amount, status, channel_refund_no, reason,
+                                   callback_count, stock_restored, retry_count,
+                                   create_time, update_time)
+        VALUES (#{refundNo}, #{orderNo}, #{paymentNo}, #{userId}, #{amount}, #{fee},
+                #{refundAmount}, #{status}, #{channelRefundNo}, #{reason},
+                #{callbackCount}, #{stockRestored}, #{retryCount},
+                #{createTime}, #{updateTime})
+    </insert>
+
+    <select id="selectByRefundNo" resultMap="refundResultMap">
+        SELECT id, refund_no, order_no, payment_no, user_id, amount, fee, refund_amount,
+               status, channel_refund_no, reason, callback_count, stock_restored, retry_count,
+               create_time, update_time
+        FROM refund_record
+        WHERE refund_no = #{refundNo}
+    </select>
+
+    <select id="selectByOrderNo" resultMap="refundResultMap">
+        SELECT id, refund_no, order_no, payment_no, user_id, amount, fee, refund_amount,
+               status, channel_refund_no, reason, callback_count, stock_restored, retry_count,
+               create_time, update_time
+        FROM refund_record
+        WHERE order_no = #{orderNo}
+        LIMIT 1
+    </select>
+
+    <!-- 条件更新：只有"退款中"才能置为"退款成功"，返回 0 即重复回调 -->
+    <update id="casSuccess">
+        UPDATE refund_record
+        SET status = '退款成功',
+            channel_refund_no = #{channelRefundNo},
+            update_time = NOW()
+        WHERE refund_no = #{refundNo}
+          AND status = '退款中'
+    </update>
+
+    <update id="casFailed">
+        UPDATE refund_record
+        SET status = '退款失败',
+            update_time = NOW()
+        WHERE refund_no = #{refundNo}
+          AND status = '退款中'
+    </update>
+
+    <update id="incrCallbackCount">
+        UPDATE refund_record
+        SET callback_count = callback_count + 1,
+            update_time = NOW()
+        WHERE refund_no = #{refundNo}
+    </update>
+
+    <!-- ================= 以下为对账任务使用 ================= -->
+
+    <!-- 用 update_time 判定：PROCESSING 会刷新它，避免同一单每轮被反复扫到 -->
+    <select id="listStaleRefunding" resultMap="refundResultMap">
+        SELECT id, refund_no, order_no, payment_no, user_id, amount, fee, refund_amount,
+               status, channel_refund_no, reason, callback_count, stock_restored, retry_count,
+               create_time, update_time
+        FROM refund_record
+        WHERE status = '退款中'
+          AND update_time &lt; DATE_SUB(NOW(), INTERVAL #{timeoutSeconds} SECOND)
+        ORDER BY update_time ASC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 条件 stock_restored = 0：重复置 1 无副作用 -->
+    <update id="markStockRestored">
+        UPDATE refund_record
+        SET stock_restored = 1,
+            update_time = NOW()
+        WHERE refund_no = #{refundNo}
+          AND stock_restored = 0
+    </update>
+
+    <update id="updateChannelRefundNo">
+        UPDATE refund_record
+        SET channel_refund_no = #{channelRefundNo},
+            update_time = NOW()
+        WHERE refund_no = #{refundNo}
+    </update>
+
+    <update id="touchUpdateTime">
+        UPDATE refund_record
+        SET update_time = NOW()
+        WHERE refund_no = #{refundNo}
+    </update>
+
+    <update id="incrRetryCount">
+        UPDATE refund_record
+        SET retry_count = retry_count + 1,
+            update_time = NOW()
+        WHERE refund_no = #{refundNo}
+    </update>
+
+    <!-- 转人工：999 是人工标记值，条件带 < 999 保证只有第一次真正生效 -->
+    <update id="flagManual">
+        UPDATE refund_record
+        SET retry_count = 999,
+            update_time = NOW()
+        WHERE refund_no = #{refundNo}
+          AND retry_count &lt; 999
+    </update>
+
+</mapper>

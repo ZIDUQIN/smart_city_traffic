@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.smartcity.traffic.mapper.TrainMapper">
+
+    <resultMap id="trainResultMap" type="com.smartcity.traffic.entity.Train">
+        <id column="id" property="id"/>
+        <result column="train_no" property="trainNo"/>
+        <result column="start_station_id" property="startStationId"/>
+        <result column="end_station_id" property="endStationId"/>
+        <result column="depart_time" property="departTime"/>
+        <result column="arrive_time" property="arriveTime"/>
+        <result column="sale_start_time" property="saleStartTime"/>
+        <result column="sale_end_time" property="saleEndTime"/>
+        <result column="status" property="status"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="trainResultMap">
+        SELECT id, train_no, start_station_id, end_station_id,
+               depart_time, arrive_time, sale_start_time, sale_end_time, status
+        FROM train
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectActiveAll" resultMap="trainResultMap">
+        SELECT id, train_no, start_station_id, end_station_id,
+               depart_time, arrive_time, sale_start_time, sale_end_time, status
+        FROM train
+        WHERE status = 1
+        ORDER BY train_no ASC
+    </select>
+
+    <resultMap id="stationVOResultMap" type="com.smartcity.traffic.dto.StationVO">
+        <id column="id" property="id"/>
+        <result column="station_name" property="stationName"/>
+        <result column="city" property="city"/>
+    </resultMap>
+
+    <select id="selectAllStations" resultMap="stationVOResultMap">
+        SELECT id, station_name, city
+        FROM station
+        ORDER BY station_name ASC
+    </select>
+
+    <resultMap id="trainRouteRowResultMap" type="com.smartcity.traffic.dto.TrainRouteRow">
+        <result column="train_no" property="trainNo"/>
+        <result column="from_seq" property="fromSeq"/>
+        <result column="to_seq" property="toSeq"/>
+        <result column="depart_time" property="departTime"/>
+        <result column="arrive_time" property="arriveTime"/>
+    </resultMap>
+
+    <!--
+      按站对查车次：同一个车次必须同时经停两站，且上车站序 < 下车站序。
+      时刻取经停站表：tsa.depart_time 是旅客上车的时刻，tsb.arrive_time 是下车的时刻。
+    -->
+    <select id="selectByStations" resultMap="trainRouteRowResultMap">
+        SELECT t.train_no,
+               tsa.station_seq AS from_seq,
+               tsb.station_seq AS to_seq,
+               tsa.depart_time AS depart_time,
+               tsb.arrive_time AS arrive_time
+        FROM train t
+        JOIN train_station tsa ON tsa.train_id = t.id
+        JOIN station sa        ON sa.id = tsa.station_id
+        JOIN train_station tsb ON tsb.train_id = t.id
+        JOIN station sb        ON sb.id = tsb.station_id
+        WHERE t.status = 1
+          AND sa.station_name = #{fromStation}
+          AND sb.station_name = #{toStation}
+          AND tsa.station_seq &lt; tsb.station_seq
+        ORDER BY tsa.depart_time ASC, t.train_no ASC
+    </select>
+
+    <!-- 只判"这条线有没有车"：命中返回 1，一行就够。
+         站名纠错最多要试 9 组组合，走完整查询会把每趟车的票价余票都算一遍 -->
+    <select id="selectRouteExists" resultType="java.lang.Integer">
+        SELECT 1
+        FROM train t
+        JOIN train_station tsa ON tsa.train_id = t.id
+        JOIN station sa        ON sa.id = tsa.station_id
+        JOIN train_station tsb ON tsb.train_id = t.id
+        JOIN station sb        ON sb.id = tsb.station_id
+        WHERE t.status = 1
+          AND sa.station_name = #{fromStation}
+          AND sb.station_name = #{toStation}
+          AND tsa.station_seq &lt; tsb.station_seq
+        LIMIT 1
+    </select>
+
+    <select id="selectAllStationSeqNames" resultType="java.util.HashMap">
+        SELECT t.train_no      AS trainNo,
+               ts.station_seq  AS stationSeq,
+               s.station_name  AS stationName
+        FROM train_station ts
+        JOIN train t   ON t.id = ts.train_id
+        JOIN station s ON s.id = ts.station_id
+    </select>
+
+</mapper>

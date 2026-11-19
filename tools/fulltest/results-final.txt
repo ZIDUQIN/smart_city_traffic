@@ -1,0 +1,104 @@
+PASS  A1  登录返回双令牌
+PASS  A2a  错误密码 code=401
+PASS  A2b  空用户名 code=400
+PASS  A3  注册+登录 ok=True 重复注册 code=400
+PASS  A4  无token http=401
+PASS  A5  伪造token http=401
+PASS  A6  旋转后旧refresh code=400 新access可用=True
+PASS  A7  logout后 access=401 refresh=400
+PASS  A8  me不含密码 password=
+FAIL  A9  200字符用户名 code=500 msg=服务器内部错误：
+PASS  A10  注入登录 code=401
+PASS  B1  新增+脱敏 id=381582523978743808 card=6103**********1234
+PASS  B2  三种非法身份证均400=True
+PASS  B3  type0=400 type4=400
+PASS  B4  同用户重复=400 跨用户同证=200
+PASS  B5  改他人=400 删他人=400
+PASS  B6  改证撞车 code=400
+PASS  B7  列表不含他人乘车人
+PASS  B8  删=200 再删=400 不存在=400
+PASS  C1  站数=61
+PASS  C2  D2636在列 价=30 seq=1->2
+PASS  C3  同站=400 反向含D2636=False
+PASS  C4  不存在站 空列表 count=0
+FAIL  C5  remain=1 db=49 source=LOCAL
+PASS  C6  seq0=400 相等=400 席别=400
+PASS  C7  toSeq99 code=400 msg=区间超出该车次运行范围
+PASS  C8  两次400 空值标记=1
+PASS  C10  窗口外车次在但余票全0=True（观察项）
+PASS  D1  status=已确认 remain 49->48 流水=已建单
+PASS  C9  下单后查询=48 期望=48
+PASS  D6  判重 msg=该乘车人已购买此车次车票
+PASS  D10  查单=已确认 不存在=400
+FAIL  D11  越权查单 code=200 http=200（期望拒绝）
+PASS  D12  my含本人单带站名=宝鸡南 他人不可见=True
+PASS  F3  他人=400 已支付=400 不存在=400
+PASS  F1  remain 48->49 幂等记录=1
+PASS  F2  幂等 remain=49 记录=1
+PASS  D7  占位释放后再买 status=已确认
+PASS  D2  缺乘车人=400 非法席别=400 fromSeq0=400 toSeq相等=400 
+PASS  D3  他人乘车人 code=400 msg=乘车人不存在或无权使用
+PASS  D4  不存在车次 status=已取消 msg=库存未预热，请先预热（文案观察）
+PASS  D5  toSeq99 status=已取消 库存不动=True
+PASS  D13  未来=已取消 昨天=已取消
+PASS  E1  prepay 金额=30 db=30
+PASS  E5a  重复prepay 待支付笔数=2
+PASS  E2  他人=400 已取消=400 已支付=400
+PASS  E3  无效token code=400
+FAIL  E9  缺amount http=200 raw={"code":400,"message":null,"data":null}（期望FAILURE不500）
+PASS  E4  订单=已支付 流水1=支付成功
+PASS  E5b  另一笔待支付自动关闭=已关闭
+PASS  E8  重放SUCCESS 回调次数 1->2
+FAIL  E10  越权查支付 code=200（期望拒绝）
+PASS  G1  订单=已退款 流水=退款成功 remain 50->50 幂等记录=1
+PASS  G2  重复=400 未支付=400 他人=400
+FAIL  G8  越权查退款 code=200（期望拒绝）
+PASS  G6  退款重放SUCCESS 次数 1->2
+PASS  G3  并发退票 流水数=1 成功数=1
+PASS  G9  退款后占位释放可再买 orderNo=381584127209504768
+PASS  F6  顶格回补被拦 remain=50 订单=已取消 幂等记录=0 响应code=400 msg=库存回补被容量闸拦下：orderNo=381584133140250624 seatNo=SECOND_CLASS segmentNo=1（remain 已等于或超过总容量）
+PASS  G10pre  part2收尾一致性 remain=50 有效订单=0
+PASS  E6  支付错签名 raw={"code":"FAILURE"}
+PASS  E7  支付篡改金额 raw={"code":"FAILURE"}
+PASS  G4  退款错签名 raw={"code":"FAILURE"}
+PASS  G5  退款金额不符 raw={"code":"FAILURE"}
+PASS  I1  窗口7天=7 二次ensure新增=0
+PASS  I2  已售49 预热后=49 新写入=0（HSETNX不覆盖）
+PASS  I3  不存在日期预热 code=400
+PASS  I4  cleanup删=0 窗口完好=7
+PASS  D8  售罄下单 status=已取消 msg=余票不足，抢票失败
+PASS  H1  20并发成功=3 DB=0 Redis=0 订单=3
+PASS  D9  6连发 codes=200,200,200,429,429,429 429数=3
+PASS  H1cleanup  取消3单后 remain=3
+PASS  H2  竞态终态=已取消 remain=3 有效单=0 一致=True race=confirm|{"code":200,"message":"success","data":"支付处理中"} // cancel|{"code":200,"message":"success","data":null}
+PASS  H3  双取消 remain 2->3 幂等记录=1
+PASS  J1  非WAV code=400 msg=只支持 WAV 录音，请在浏览器里重新说一遍
+PASS  J2  8k=400 双声道=400
+PASS  J3  0.5s code=400 msg=说话时间太短，请按住多说一会儿
+PASS  J4  31s code=400 msg=录音太长，一次最多 30 秒
+PASS  J5  66s/2.1MB code=400 msg=录音太大了，一次最多 30 秒
+PASS  J5b  合法WAV未被格式拦截 code=400 msg=没听清，请再说一遍
+PASS  J6  空文本 code=400
+PASS  J7  昨天=DATE_OUT_OF_WINDOW +7=DATE_OUT_OF_WINDOW +6=
+PASS  J8  脏日期忽略 code=200 date=2026-11-18
+PASS  H5  专用实例一致=True 今日实例一致=True
+PASS  J9  同站 code=400 msg=出发站和到达站不能是同一个站
+PASS  J10  未登录 http=401
+PASS  Hend  part3收尾 remain=50 有效单=0
+PASS  J12  3次失败后计数=0 1次成功后=1
+PASS  K2  注入查询 code=200 count=0
+PASS  K3  XSS原样存储（前端esc()转义已核对app.js/voice.js）
+FAIL  K4  普通用户调管理端点 ensure=200 cleanup=200 preheat=200 mock注入=200（期望全拒绝）
+PASS  K1  health匿名200且UP=True（观察：details含磁盘路径/DB信息，生产应设show-details=never）
+PASS  F4  超时关单=已取消 remain 48->49 幂等记录=1 待支付残留=0
+PASS  F5  已支付超时单未被误关=已支付
+PASS  G7a  PROCESSING等待 状态=退款中 重试=0 时间已刷新=11s前
+PASS  G7b  NOT_EXIST重发 渠道单号=MOCKREFUND381584112906928128 重试=1 状态=退款中
+PASS  G7c  FAILED置失败 流水=退款失败 订单=退款中（转人工）
+PASS  G7d  回调丢失本地修复 流水=退款成功 订单=已退款
+PASS  G10  对账补库存撞幂等 remain 49->49 标记=1 记录数=1
+PASS  G7e  重发后对账修复 流水=退款成功 订单=已退款
+PASS  F4end  part4收尾 有效单=0 remain=50
+PASS  H4  越界=0 漂移=0 
+PASS  I5  巡检同口径复核 越界=0 漂移=0
+PASS  H5final  两实例Redis与DB逐段一致=True
